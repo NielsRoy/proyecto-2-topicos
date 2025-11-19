@@ -42,6 +42,10 @@ const envsSchema = joi.object({
   LINKEDIN_PROFILE_ID: joi.string().required(),
   LINKEDIN_PROFILE_ACCESS_TOKEN: joi.string().required(),
 
+  TIKTOK_CLIENT_KEY: joi.string().required(),
+  TIKTOK_CLIENT_SECRET: joi.string().required(),
+  TIKTOK_REDIRECT_URI: joi.string().required(),
+
   LOGS_PATH: joi.string().default('logs'),
 })
 .unknown(true);
