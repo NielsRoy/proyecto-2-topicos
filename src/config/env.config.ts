@@ -21,6 +21,8 @@ interface EnvVars {
   TIKTOK_CLIENT_KEY: string;
   TIKTOK_CLIENT_SECRET: string;
   TIKTOK_REDIRECT_URI: string;
+  TIKTOK_ACCESS_TOKEN: string;
+  TIKTOK_REFRESH_TOKEN: string;
 
   LOGS_PATH: string;
 }
@@ -45,6 +47,8 @@ const envsSchema = joi.object({
   TIKTOK_CLIENT_KEY: joi.string().required(),
   TIKTOK_CLIENT_SECRET: joi.string().required(),
   TIKTOK_REDIRECT_URI: joi.string().required(),
+  TIKTOK_ACCESS_TOKEN: joi.string().required(),
+  TIKTOK_REFRESH_TOKEN: joi.string().required(),
 
   LOGS_PATH: joi.string().default('logs'),
 })
@@ -78,6 +82,8 @@ export const env = {
   TIKTOK_CLIENT_KEY: envVars.TIKTOK_CLIENT_KEY,
   TIKTOK_CLIENT_SECRET: envVars.TIKTOK_CLIENT_SECRET,
   TIKTOK_REDIRECT_URI: envVars.TIKTOK_REDIRECT_URI,
+  TIKTOK_ACCESS_TOKEN: envVars.TIKTOK_ACCESS_TOKEN,
+  TIKTOK_REFRESH_TOKEN: envVars.TIKTOK_REFRESH_TOKEN,
 
   LOGS_PATH: envVars.LOGS_PATH,
 }
