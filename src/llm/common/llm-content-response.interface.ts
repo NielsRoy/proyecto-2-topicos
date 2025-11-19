@@ -1,7 +1,7 @@
-export interface AiResponse {
+export interface LlmContentResponse {
   facebook: string;
   instagram: string;
-  whatsapp: string;
   linkedin: string;
+  whatsapp: string;
   tiktok: string;
 }
