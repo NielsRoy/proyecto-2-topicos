@@ -1,4 +1,4 @@
-import { Body, Controller, Post } from "@nestjs/common";
+import { Body, Controller, Get, Post } from "@nestjs/common";
 import { PublishingService } from "./publishing.service";
 import { CreatePublicationDto } from "./dto/create-publication.dto";
 
@@ -15,5 +15,10 @@ export class PublishingController {
   @Post('test')
   test(@Body() dto: CreatePublicationDto) {
     return this.publishingService.test(dto);
+  }
+
+  @Get()
+  status() {
+    return "App running";
   }
 }
