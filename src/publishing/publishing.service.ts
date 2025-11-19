@@ -1,10 +1,10 @@
 import { Injectable, Inject, Logger } from '@nestjs/common';
-import { PromptService } from 'src/llm/services/prompt.service';
-import { SocialMediaPublisher } from 'src/platforms/common/social-media-publisher.interface';
+import { PromptService } from '../llm/services/prompt.service';
+import { SocialMediaPublisher } from '../platforms/common/social-media-publisher.interface';
 import { CreatePublicationDto } from './dto/create-publication.dto';
-import type { LlmService } from 'src/llm/common/llm-service.interface';
+import type { LlmService } from '../llm/common/llm-service.interface';
 import { LLM_SERVICE, SOCIAL_MEDIA_PUBLISHER } from 'src/config/injection-tokens';
-import { PublishResult } from 'src/platforms/common/publis-result.interface';
+import { PublishResult } from '../platforms/common/publis-result.interface';
 
 @Injectable()
 export class PublishingService {

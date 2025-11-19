@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { SocialMediaPublisher } from '../common/social-media-publisher.interface';
 import { PublishResult } from '../common/publis-result.interface';
-import { env } from 'src/config/env.config';
+import { env } from '../../config/env.config';
 import { HttpService } from '@nestjs/axios';
 import { AxiosError, AxiosRequestConfig } from 'axios';
 import { CreateContainerRequest, CreateContainerResponse } from '../interfaces/instagram.types';

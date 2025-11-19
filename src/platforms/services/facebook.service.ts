@@ -4,7 +4,7 @@ import { PublishResult } from '../common/publis-result.interface';
 import { HttpService } from '@nestjs/axios';
 import { AxiosError, AxiosRequestConfig } from 'axios';
 import { FacebookResponse } from '../interfaces/facebook-response.interface';
-import { env } from 'src/config/env.config';
+import { env } from '../../config/env.config';
 
 @Injectable()
 export class FacebookService implements SocialMediaPublisher {

@@ -1,6 +1,6 @@
 import { Injectable, Logger } from "@nestjs/common";
 import { LlmContentResponse } from "../common/llm-content-response.interface";
-import { env } from "src/config/env.config";
+import { env } from "../../config/env.config";
 import { GoogleGenAI } from "@google/genai";
 import { LlmService } from "../common/llm-service.interface";
 
