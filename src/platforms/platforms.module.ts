@@ -5,11 +5,13 @@ import { InstagramService } from './services/instagram.service';
 import { SOCIAL_MEDIA_PUBLISHER } from '../config/injection-tokens';
 import { HttpModule } from '@nestjs/axios';
 import { TiktokAuthController } from './controllers/tiktok-auth.controller';
+import { TiktokService } from './services/tiktok.service';
 
 const platformServices = [
   FacebookService,
   InstagramService,
   LinkedInService,
+  TiktokService,
 ];
 
 @Module({
