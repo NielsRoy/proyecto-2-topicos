@@ -24,6 +24,10 @@ interface EnvVars {
   TIKTOK_ACCESS_TOKEN: string;
   TIKTOK_REFRESH_TOKEN: string;
 
+  TWILIO_ACCOUNT_SID: string;
+  TWILIO_AUTH_TOKEN: string;
+  TWILIO_PHONE_NUMBER: string;
+
   LOGS_PATH: string;
 }
 
@@ -49,6 +53,10 @@ const envsSchema = joi.object({
   TIKTOK_REDIRECT_URI: joi.string().required(),
   TIKTOK_ACCESS_TOKEN: joi.string().required(),
   TIKTOK_REFRESH_TOKEN: joi.string().required(),
+
+  TWILIO_ACCOUNT_SID: joi.string().required(),
+  TWILIO_AUTH_TOKEN: joi.string().required(),
+  TWILIO_PHONE_NUMBER: joi.string().required(),
 
   LOGS_PATH: joi.string().default('logs'),
 })
@@ -84,6 +92,10 @@ export const env = {
   TIKTOK_REDIRECT_URI: envVars.TIKTOK_REDIRECT_URI,
   TIKTOK_ACCESS_TOKEN: envVars.TIKTOK_ACCESS_TOKEN,
   TIKTOK_REFRESH_TOKEN: envVars.TIKTOK_REFRESH_TOKEN,
+
+  TWILIO_ACCOUNT_SID: envVars.TWILIO_ACCOUNT_SID,
+  TWILIO_AUTH_TOKEN: envVars.TWILIO_AUTH_TOKEN,
+  TWILIO_PHONE_NUMBER: envVars.TWILIO_PHONE_NUMBER,
 
   LOGS_PATH: envVars.LOGS_PATH,
 }

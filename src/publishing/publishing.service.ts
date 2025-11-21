@@ -50,8 +50,10 @@ export class PublishingService {
 
   async test(dto: CreatePublicationDto) {
     this.logger.log(`Procesando solicitud: ${dto.message}`);
-    const enhancedPrompt = this.promptService.generate(dto.message);
-    this.logger.log(enhancedPrompt);
-    return enhancedPrompt;
+    
+    const publisher = this.platformMap.get("whatsapp");
+    publisher?.publish(dto.message);
+
+    //return enhancedPrompt;
   }
 }
