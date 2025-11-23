@@ -1,9 +1,19 @@
 import 'dotenv/config';
 import * as joi from 'joi';
+import type { StringValue } from "ms";
 
 interface EnvVars {
   STATE: 'production' | 'development';
   PORT: number;
+
+  APP_JWT_SECRET: string;
+  APP_JWT_EXPIRATION: StringValue;
+
+  DB_HOST: string;
+  DB_PORT: number;
+  DB_USERNAME: string;
+  DB_PASSWORD: string;
+  DB_DATABASE: string;
 
   GEMINI_API_KEY: string;
 
@@ -34,6 +44,15 @@ interface EnvVars {
 const envsSchema = joi.object({
   STATE: joi.allow('production','development').required(),
   PORT: joi.number().required(),
+
+  DB_HOST: joi.string().required(),
+  DB_PORT: joi.number().required(),
+  DB_USERNAME: joi.string().required(),
+  DB_PASSWORD: joi.string().required(),
+  DB_DATABASE: joi.string().required(),
+
+  APP_JWT_SECRET: joi.string().required(),
+  APP_JWT_EXPIRATION: joi.string().required(),
 
   GEMINI_API_KEY: joi.string().required(),
 
@@ -73,6 +92,15 @@ const envVars:EnvVars = value;
 export const env = {
   STATE: envVars.STATE,
   PORT: envVars.PORT,
+
+  APP_JWT_SECRET: envVars.APP_JWT_SECRET,
+  APP_JWT_EXPIRATION: envVars.APP_JWT_EXPIRATION,
+
+  DB_HOST: envVars.DB_HOST,
+  DB_PORT: envVars.DB_PORT,
+  DB_USERNAME: envVars.DB_USERNAME,
+  DB_PASSWORD: envVars.DB_PASSWORD,
+  DB_DATABASE: envVars.DB_DATABASE,
 
   GEMINI_API_KEY: envVars.GEMINI_API_KEY,
 
