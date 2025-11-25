@@ -1,8 +1,9 @@
-import { IsNotEmpty, IsString } from "class-validator";
+import { SocialMedia } from "../enum/social-media.enum";
 
-export class CreatePublicationDto {
-  
-  @IsString()
-  @IsNotEmpty()
-  message: string;
+export class createPublicationDto {
+  textContent: string;
+  filepath: string;
+  publicUrl: string;
+  socialMedia: SocialMedia;
+  chatInputId: number;
 }

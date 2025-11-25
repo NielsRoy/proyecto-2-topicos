@@ -16,6 +16,7 @@ interface EnvVars {
   DB_DATABASE: string;
 
   GEMINI_API_KEY: string;
+  OPENAI_API_KEY: string;
 
   PROMPT_TEMPLATE_FILE: string;
 
@@ -34,9 +35,11 @@ interface EnvVars {
   TIKTOK_ACCESS_TOKEN: string;
   TIKTOK_REFRESH_TOKEN: string;
 
-  TWILIO_ACCOUNT_SID: string;
-  TWILIO_AUTH_TOKEN: string;
-  TWILIO_PHONE_NUMBER: string;
+  WHATSAPP_API_TOKEN: string;
+
+  CLOUDINARY_CLOUD_NAME: string;
+  CLOUDINARY_API_KEY: string;
+  CLOUDINARY_API_SECRET: string;
 
   LOGS_PATH: string;
 }
@@ -55,6 +58,7 @@ const envsSchema = joi.object({
   APP_JWT_EXPIRATION: joi.string().required(),
 
   GEMINI_API_KEY: joi.string().required(),
+  OPENAI_API_KEY: joi.string().required(),
 
   PROMPT_TEMPLATE_FILE: joi.string().required(),
 
@@ -73,9 +77,11 @@ const envsSchema = joi.object({
   TIKTOK_ACCESS_TOKEN: joi.string().required(),
   TIKTOK_REFRESH_TOKEN: joi.string().required(),
 
-  TWILIO_ACCOUNT_SID: joi.string().required(),
-  TWILIO_AUTH_TOKEN: joi.string().required(),
-  TWILIO_PHONE_NUMBER: joi.string().required(),
+  WHATSAPP_API_TOKEN: joi.string().required(),
+
+  CLOUDINARY_CLOUD_NAME: joi.string().required(),
+  CLOUDINARY_API_KEY: joi.string().required(),
+  CLOUDINARY_API_SECRET: joi.string().required(),
 
   LOGS_PATH: joi.string().default('logs'),
 })
@@ -103,6 +109,7 @@ export const env = {
   DB_DATABASE: envVars.DB_DATABASE,
 
   GEMINI_API_KEY: envVars.GEMINI_API_KEY,
+  OPENAI_API_KEY: envVars.OPENAI_API_KEY,
 
   PROMPT_TEMPLATE_FILE: envVars.PROMPT_TEMPLATE_FILE,
 
@@ -121,9 +128,11 @@ export const env = {
   TIKTOK_ACCESS_TOKEN: envVars.TIKTOK_ACCESS_TOKEN,
   TIKTOK_REFRESH_TOKEN: envVars.TIKTOK_REFRESH_TOKEN,
 
-  TWILIO_ACCOUNT_SID: envVars.TWILIO_ACCOUNT_SID,
-  TWILIO_AUTH_TOKEN: envVars.TWILIO_AUTH_TOKEN,
-  TWILIO_PHONE_NUMBER: envVars.TWILIO_PHONE_NUMBER,
+  WHATSAPP_API_TOKEN: envVars.WHATSAPP_API_TOKEN,
+
+  CLOUDINARY_CLOUD_NAME: envVars.CLOUDINARY_CLOUD_NAME,
+  CLOUDINARY_API_KEY: envVars.CLOUDINARY_API_KEY,
+  CLOUDINARY_API_SECRET: envVars.CLOUDINARY_API_SECRET,
 
   LOGS_PATH: envVars.LOGS_PATH,
 }

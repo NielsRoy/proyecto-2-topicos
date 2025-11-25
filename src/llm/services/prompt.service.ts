@@ -1,39 +1,34 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import * as path from 'path';
 import * as fs from 'fs';
-import { env } from 'src/config/env.config';
+import { env } from '../../config/env.config';
 
 @Injectable()
 export class PromptService implements OnModuleInit {
   private readonly logger = new Logger(PromptService.name);
-  private template: string = '';
-  private readonly PLACEHOLDER = '[MENSAJE_DEL_USUARIO]';
+  private prompt: string = '';
 
   onModuleInit() {
-    this.loadTemplate();
+    const filename = 'prompt-v0.0.3.txt';
+    const filepath = path.join(process.cwd(), 'dist', 'prompts', filename);
+    this.prompt = this.loadTemplate(filepath);
   }
 
-  private loadTemplate() {
-    
-    const filename = env.PROMPT_TEMPLATE_FILE;
-    const filePath = path.join(process.cwd(), 'dist', 'prompts', filename);
-
+  private loadTemplate(filepath: string): string {
     try {
-      this.logger.log(`Cargando plantilla de prompt desde: ${filename}`);
-      this.template = fs.readFileSync(filePath, 'utf-8');
-      if (!this.template.includes(this.PLACEHOLDER)) {
-        this.logger.warn(`La plantilla cargada no contiene el placeholder: ${this.PLACEHOLDER}`);
-      }
+      this.logger.log(`Cargando prompt maestro desde: ${filepath}`);
+      const template = fs.readFileSync(filepath, 'utf-8');
+      return template;
     } catch (error) {
-      this.logger.error(`Error fatal cargando la plantilla: ${filePath}`, error.stack);
-      throw new Error('No se pudo cargar la plantilla de prompt inicial.');
+      this.logger.error(`Error fatal cargando el prompt maestro: ${filepath}`, error.stack);
+      throw new Error('No se pudo cargar el prompt maestro.');
     }
   }
 
-  generate(message: string): string {
-    if (!this.template) {
-        throw new Error('La plantilla de prompt no está cargada.');
+  generate(): string {
+    if (!this.prompt) {
+      throw new Error('El prompt maestro para generar recursos no está cargado.');
     }
-    return this.template.replace(this.PLACEHOLDER, message);
-  } 
+    return this.prompt;
+  }
 }

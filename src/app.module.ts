@@ -5,6 +5,7 @@ import { LlmModule } from './llm/llm.module';
 import { UsersModule } from './users/users.module';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { env } from './config/env.config';
+import { StorageModule } from './storage/storage.module';
 
 @Module({
   imports: [
@@ -28,6 +29,7 @@ import { env } from './config/env.config';
       synchronize: true,
       autoLoadEntities: true,
     }),
+    StorageModule,
   ],
 })
 export class AppModule {}

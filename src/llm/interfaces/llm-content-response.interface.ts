@@ -4,4 +4,6 @@ export interface LlmContentResponse {
   linkedin: string;
   whatsapp: string;
   tiktok: string;
+  dalle_prompt: string;
+  sora_prompt: string;
 }

@@ -9,7 +9,7 @@ import { SignInDto } from '../dto/sign-in.dto';
 import { instanceToInstance, instanceToPlain } from 'class-transformer';
 import { AuthResponse } from '../interfaces/auth-response.interface';
 import { HASH_SERVICE } from '../../config/injection-tokens';
-import type { HashService } from '../common/hash.service';
+import type { HashService } from '../common/hash-service.interface';
 import { ErrorHandlerUtil } from '../../common/utils/error-handler.util';
 
 @Injectable()

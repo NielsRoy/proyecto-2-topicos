@@ -1,27 +1,19 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { HttpService } from '@nestjs/axios';
 import { AxiosError, AxiosRequestConfig } from 'axios';
-import * as fs from 'fs';
-import * as path from 'path';
 import { SocialMediaPublisher } from '../common/social-media-publisher.interface';
-import { PublishResult } from '../common/publis-result.interface';
+import { PublishResult } from '../interfaces/publish-result.interface';
 import { TikTokInitResponse, TikTokStatusResponse } from '../interfaces/tiktok.types';
 import { env } from '../../config/env.config';
+import { PublicationData } from '../interfaces/publication-data.interface';
+import { LocalStorageService } from '../../storage/services/local-storage.service';
 
 @Injectable()
 export class TiktokService implements SocialMediaPublisher {
   readonly platformName = 'tiktok';
   private readonly logger = new Logger(TiktokService.name);
-  
   private readonly baseUrl = "https://open.tiktokapis.com/v2/post/publish";
-  
-  // RUTA DEL VIDEO LOCAL
-  // process.cwd() apunta a la raíz donde ejecutas npm run start (usualmente la raíz del proyecto)
-  // Asegúrate de poner un archivo 'video_prueba.mp4' ahí.
-  private readonly localVideoPath = path.join(process.cwd(), 'video_prueba.mp4');
-
   private readonly accessToken = env.TIKTOK_ACCESS_TOKEN; 
-
   private readonly requestConfig: AxiosRequestConfig = {
     headers: {
       'Authorization': `Bearer ${this.accessToken}`,
@@ -32,54 +24,53 @@ export class TiktokService implements SocialMediaPublisher {
   private readonly MAX_RETRIES = 10; 
   private readonly RETRY_DELAY_MS = 5000; 
 
-  constructor(private readonly httpService: HttpService) {}
+  constructor(
+    private readonly httpService: HttpService,
+    private readonly localStorageService: LocalStorageService,
+  ) {}
 
-  async publish(content: string): Promise<PublishResult> {
+  async publish(data: PublicationData): Promise<PublishResult> {
+    const { textContent, filepath } = data;
+    if (!filepath) {
+      return { 
+        success: false, platform: this.platformName, error: `El archivo de video es obligatorio` 
+      };
+    }
     this.logger.log(`Iniciando flujo de publicación (FILE_UPLOAD) en TikTok`, {
       action: 'start_publish',
-      videoPath: this.localVideoPath
+      videoPath: filepath
     });
 
-    // 0. Verificar que el archivo existe antes de empezar
-    if (!fs.existsSync(this.localVideoPath)) {
-        return { 
-            success: false, 
-            platform: this.platformName, 
-            error: `El archivo de video no existe en la ruta: ${this.localVideoPath}` 
-        };
-    }
-
     try {
-      // PASO 1: Leer el archivo para obtener su tamaño
-      const fileBuffer = fs.readFileSync(this.localVideoPath);
+      const fileBuffer = this.localStorageService.read(filepath);
       const fileSize = fileBuffer.length;
 
-      // PASO 2: Inicializar la carga (Pedirle permiso a TikTok y obtener la URL de subida)
-      const { publishId, uploadUrl } = await this.initiatePublish(content, fileSize);
+      // PASO 1: Inicializar la carga (Pedirle permiso a TikTok y obtener la URL de subida)
+      const { data } = await this.initiatePublish(textContent, fileSize);
+      const { publish_id, upload_url } = data;
 
       this.logger.log(`Inicialización exitosa. Subiendo video a TikTok...`, {
         action: 'uploading_video',
         size: fileSize,
-        uploadUrl: uploadUrl.substring(0, 30) + '...' // Logueamos solo una parte por seguridad
+        uploadUrl: upload_url.substring(0, 30) + '...'
       });
 
-      // PASO 3: Subir el binario del video a la URL que nos dio TikTok
-      await this.uploadVideoFile(uploadUrl, fileBuffer);
+      // PASO 2: Subir el binario del video a la URL que nos dio TikTok
+      await this.uploadVideoFile(upload_url, fileBuffer);
 
       this.logger.log(`Video subido correctamente. Esperando procesamiento...`, {
         action: 'wait_processing',
-        publishId: publishId
+        publishId: publish_id
       });
 
-      // PASO 4: Polling (Esperar a que TikTok procese)
-      const finalPostId = await this.waitForProcessing(publishId);
+      // PASO 3: Polling (Esperar a que TikTok procese)
+      const finalPostId = await this.waitForProcessing(publish_id);
 
       return { 
         success: true, 
         platform: this.platformName, 
         url: `https://www.tiktok.com/video/${finalPostId}` 
       };
-
     } catch (error) {
       this.logger.error('Falló el flujo de publicación en TikTok', {
         action: 'publish_failed',
@@ -93,9 +84,8 @@ export class TiktokService implements SocialMediaPublisher {
   /**
    * Paso 1: Decirle a TikTok que vamos a subir un archivo local.
    * Enviamos el tamaño exacto del archivo.
-   * AJUSTE: Modo "Paranoico" de privacidad para evitar error 403 en Sandbox.
    */
-  private async initiatePublish(title: string, fileSizeInBytes: number): Promise<{ publishId: string, uploadUrl: string }> {
+  private async initiatePublish(title: string, fileSizeInBytes: number): Promise<TikTokInitResponse> {
     const url = `${this.baseUrl}/video/init/`;
     
     const payload = {
@@ -114,7 +104,6 @@ export class TiktokService implements SocialMediaPublisher {
         total_chunk_count: 1
       }
     };
-
     try {
       const response = await this.httpService.axiosRef.post<TikTokInitResponse>(url, payload, this.requestConfig);
 
@@ -128,10 +117,8 @@ export class TiktokService implements SocialMediaPublisher {
           throw new Error('La respuesta de TikTok no contiene publish_id o upload_url');
       }
 
-      return { publishId: publish_id, uploadUrl: upload_url };
-
+      return response.data;
     } catch (error) {
-      // Si falla, logueamos el payload que enviamos para depurar
       this.logger.error(`Error iniciando publicación con payload: ${JSON.stringify(payload)}`);
       this.handleAxiosError(error, 'Error iniciando upload en TikTok');
       throw error;
@@ -165,7 +152,7 @@ export class TiktokService implements SocialMediaPublisher {
   }
 
   /**
-   * Paso 3: Polling (Idéntico al anterior, con la corrección del return)
+   * Paso 3: Polling
    */
   private async waitForProcessing(publishId: string): Promise<string> {
     const url = `${this.baseUrl}/status/fetch/`;
@@ -177,9 +164,9 @@ export class TiktokService implements SocialMediaPublisher {
         const statusData = response.data.data;
 
         this.logger.log(`Estado TikTok (Intento ${attempt}): ${statusData.status}`, {
-            action: 'polling_status',
-            status: statusData.status,
-            reason: statusData.fail_reason
+          action: 'polling_status',
+          status: statusData.status,
+          reason: statusData.fail_reason
         });
 
         if (statusData.status === 'PUBLISH_COMPLETE') {
@@ -196,7 +183,6 @@ export class TiktokService implements SocialMediaPublisher {
         }
 
         await this.sleep(this.RETRY_DELAY_MS);
-
       } catch (error) {
         if (error.message.includes('La publicación falló') || error.message.includes('Tiempo de espera agotado')) {
             throw error;

@@ -1,67 +1,144 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { SocialMediaPublisher } from '../common/social-media-publisher.interface';
-import { PublishResult } from '../common/publis-result.interface';
+import { PublishResult } from '../interfaces/publish-result.interface';
 import { env } from '../../config/env.config';
 import { AxiosError, AxiosRequestConfig } from 'axios';
 import { HttpService } from '@nestjs/axios';
-import { LinkedInResponse } from '../interfaces/linkedin-response.interface';
+import { PublicationData } from '../interfaces/publication-data.interface';
+import { LocalStorageService } from '../../storage/services/local-storage.service';
 
 @Injectable()
 export class LinkedInService implements SocialMediaPublisher {
   readonly platformName = 'linkedin';
-  private readonly logger = new Logger(LinkedInService.name); // O tu JsonLogger
+  private readonly logger = new Logger(LinkedInService.name);
   private readonly baseUrl = "https://api.linkedin.com/v2";
   private readonly profileId = env.LINKEDIN_PROFILE_ID;
   private readonly accessToken = env.LINKEDIN_PROFILE_ACCESS_TOKEN;
+  
+  private readonly config: AxiosRequestConfig = {
+    headers: {
+      'Authorization': `Bearer ${this.accessToken}`,
+      'Content-Type': 'application/json',
+      'X-Restli-Protocol-Version': '2.0.0'
+    },
+  };
 
-  constructor(private readonly httpService: HttpService) {}
+  constructor(
+    private readonly httpService: HttpService,
+    private readonly localStorageService: LocalStorageService,
+  ) {}
 
-  async publish(content: string): Promise<PublishResult> {
-    const postUrl = `${this.baseUrl}/ugcPosts`;
-    const data = {
+  async publish(data: PublicationData): Promise<PublishResult> {
+    try {
+      const { textContent, filepath } = data;
+      if (filepath) {
+        return await this.publishWithImage(textContent, filepath);
+      }
+      return await this.publishText(textContent);
+    } catch (error) {
+      const axiosError = error as AxiosError;
+      this.logger.error('Fallo general al publicar en LinkedIn', {
+        platform: this.platformName,
+        error: axiosError.message,
+        response: axiosError.response?.data
+      });
+      return { success: false, platform: this.platformName, error: axiosError.message };
+    }
+  }
+
+  private async publishText(content: string): Promise<PublishResult> {
+    const body = {
       author: `urn:li:person:${this.profileId}`,
       lifecycleState: "PUBLISHED",
       specificContent: {
         "com.linkedin.ugc.ShareContent": {
-          shareCommentary: {
-            text: content
-          },
+          shareCommentary: { text: content },
           shareMediaCategory: "NONE"
         }
       },
-      visibility: {
-        "com.linkedin.ugc.MemberNetworkVisibility": "PUBLIC"
+      visibility: { "com.linkedin.ugc.MemberNetworkVisibility": "PUBLIC" }
+    };
+    return this.sendPostRequest(body);
+  }
+
+  private async publishWithImage(message: string, filepath: string): Promise<PublishResult> {
+    this.logger.log(`Iniciando carga de imagen para LinkedIn: ${filepath}`);
+
+    // PASO 1: Registrar la carga de la imagen 
+    const registerUrl = `${this.baseUrl}/assets?action=registerUpload`;
+    const registerBody = {
+      registerUploadRequest: {
+        recipes: ["urn:li:digitalmediaRecipe:feedshare-image"],
+        owner: `urn:li:person:${this.profileId}`,
+        serviceRelationships: [
+          {
+            relationshipType: "OWNER",
+            identifier: "urn:li:userGeneratedContent"
+          }
+        ]
       }
     };
-    const config: AxiosRequestConfig = {
+
+    const registerResponse = await this.httpService.axiosRef.post(registerUrl, registerBody, this.config);
+    
+    const uploadUrl = registerResponse.data.value.uploadMechanism['com.linkedin.digitalmedia.uploading.MediaUploadHttpRequest'].uploadUrl;
+    const assetUrn = registerResponse.data.value.asset;
+
+    // PASO 2: Subir el archivo binario
+    this.logger.log('Subiendo binario a LinkedIn...');
+    
+    //TODO: Revisar si publish() captura bien el mensaje de error de localStorageService
+    const fileBuffer = this.localStorageService.read(filepath);
+    //const fileBuffer = await fs.readFile(filepath);
+    
+    await this.httpService.axiosRef.post(uploadUrl, fileBuffer, {
       headers: {
         'Authorization': `Bearer ${this.accessToken}`,
-        'Content-Type': 'application/json',
+        'Content-Type': 'application/octet-stream' // Tipo genérico para binarios
+      }
+    });
+
+    // PASO 3: Crear el post referenciando el asset
+    const postBody = {
+      author: `urn:li:person:${this.profileId}`,
+      lifecycleState: "PUBLISHED",
+      specificContent: {
+        "com.linkedin.ugc.ShareContent": {
+          shareCommentary: { text: message },
+          shareMediaCategory: "IMAGE",
+          media: [
+            {
+              status: "READY",
+              description: { text: "Image generated by AI" },
+              media: assetUrn,
+              title: { text: "Shared Image" }
+            }
+          ]
+        }
       },
+      visibility: { "com.linkedin.ugc.MemberNetworkVisibility": "PUBLIC" }
     };
-    this.logger.log(`Publicando en LinkedIn: ${content.substring(0, 20)}...`);
+
+    return this.sendPostRequest(postBody);
+  }
+
+  private async sendPostRequest(body: any): Promise<PublishResult> {
+    const postUrl = `${this.baseUrl}/ugcPosts`;
     try {
-      const response = await this.httpService.axiosRef.post(postUrl, data, config);
+      const response = await this.httpService.axiosRef.post(postUrl, body, this.config);
       
-      this.logger.log('Respuesta exitosa de LinkedIn', {
-        platform: this.platformName,
-        state: 'success',
+      this.logger.log('Publicación exitosa en LinkedIn', {
         statusCode: response.status,
-        responseData: response.data,
+        id: response.headers['x-restli-id'] // ID del post creado
       });
 
-      return { success: true, platform: this.platformName, url: "" };
+      return { 
+        success: true, 
+        platform: this.platformName, 
+        url: `https://www.linkedin.com/feed/update/${response.data.id || ''}`
+      };
     } catch (error) {
-      const axiosError = error as AxiosError;
-      this.logger.error('Fallo al publicar en LinkedIn', {
-        platform: this.platformName,
-        state: 'error',
-        statusCode: axiosError.response?.status,
-        errorMessage: axiosError.message,
-        responseData: axiosError.response?.data,
-        stack: error.stack
-      });
-      return { success: false, platform: this.platformName, error: error.message };
+      throw error; // Re-lanzar para que el try-catch principal lo maneje
     }
   }
 }

@@ -10,7 +10,7 @@ import {
 import { Exclude } from 'class-transformer';
 // import { Role } from '../enums/role.enum';
 
-@Entity('users')
+@Entity('user')
 export class User {
   @PrimaryGeneratedColumn()
   id: number;

@@ -1,11 +1,11 @@
 import { Injectable, Logger } from "@nestjs/common";
-import { LlmContentResponse } from "../common/llm-content-response.interface";
+import { LlmContentResponse } from "../interfaces/llm-content-response.interface";
 import { env } from "../../config/env.config";
 import { GoogleGenAI } from "@google/genai";
-import { LlmService } from "../common/llm-service.interface";
+import { LLMService } from "../common/llm-service.interface";
 
 @Injectable()
-export class GeminiService implements LlmService {
+export class GeminiService implements LLMService {
   
   private readonly logger = new Logger(GeminiService.name);
 
@@ -13,11 +13,11 @@ export class GeminiService implements LlmService {
     apiKey: env.GEMINI_API_KEY
   });
 
-  async generateContent(prompt: string): Promise<LlmContentResponse> {
+  async generate(systemPrompt: string, userMessage: string): Promise<LlmContentResponse> {
     try {
       const response = await this.ai.models.generateContent({
         model: "gemini-2.5-flash",
-        contents: prompt,
+        contents: systemPrompt
       });
       const jsonString = response.text;
       this.logger.log(`Respuesta JSON (string) recibida del LLM: ${jsonString}`);
