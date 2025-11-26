@@ -22,7 +22,7 @@ async function bootstrap() {
       forbidNonWhitelisted: true,
     }),
   );
-
+  app.enableCors();
   await app.listen(env.PORT);
 
   logger.log(`App running on port: ${env.PORT}`);
