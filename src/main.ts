@@ -8,11 +8,11 @@ const logger = new Logger('main');
 
 async function bootstrap() {
   
-  // const app = await NestFactory.create(AppModule, {
-  //   logger: loggerConfig
-  // });
+  const app = await NestFactory.create(AppModule, {
+    logger: loggerConfig
+  });
 
-  const app = await NestFactory.create(AppModule);
+  //const app = await NestFactory.create(AppModule);
 
   app.setGlobalPrefix('api');
 
