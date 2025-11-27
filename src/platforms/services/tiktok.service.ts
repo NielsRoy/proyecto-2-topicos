@@ -1,6 +1,5 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
-import { HttpService } from '@nestjs/axios';
-import { AxiosError, AxiosRequestConfig } from 'axios';
+import axios, { AxiosError, AxiosInstance, AxiosRequestConfig } from 'axios';
 import { SocialMediaPublisher } from '../common/social-media-publisher.interface';
 import { PublishResult } from '../interfaces/publish-result.interface';
 import { TikTokInitResponse, TikTokStatusResponse } from '../interfaces/tiktok.types';
@@ -12,25 +11,113 @@ import type { StorageService } from '../../storage/common/file-storage.interface
 @Injectable()
 export class TiktokService implements SocialMediaPublisher {
   readonly platformName = 'tiktok';
-  private readonly logger = new Logger(TiktokService.name);
+  private readonly logger = new Logger('TiktokService');
+  private readonly plogger = new Logger('TikTok');
+
   private readonly baseUrl = "https://open.tiktokapis.com/v2/post/publish";
-  private readonly accessToken = env.TIKTOK_ACCESS_TOKEN; 
-  private readonly requestConfig: AxiosRequestConfig = {
-    headers: {
-      'Authorization': `Bearer ${this.accessToken}`,
-      'Content-Type': 'application/json; charset=UTF-8',
-    },
-  };
+
+  private accessToken = env.TIKTOK_ACCESS_TOKEN; 
+  private refreshToken = env.TIKTOK_REFRESH_TOKEN; 
+  private clientKey = env.TIKTOK_CLIENT_KEY;       
+  private clientSecret = env.TIKTOK_CLIENT_SECRET; 
+
+  private readonly tiktokApi: AxiosInstance;
 
   private readonly MAX_RETRIES = 10; 
   private readonly RETRY_DELAY_MS = 5000; 
 
   constructor(
-    private readonly httpService: HttpService,
-    
     @Inject(STORAGE_SERVICE)
     private readonly storageService: StorageService,
-  ) {}
+  ) {
+    this.tiktokApi = axios.create({
+      baseURL: this.baseUrl,
+      headers: {
+        'Content-Type': 'application/json; charset=UTF-8',
+      },
+    });
+
+    // 2. Configuramos los interceptores SOLO en esta instancia privada
+    this.setupInterceptors();
+  }
+
+  private setupInterceptors() {
+    // Request Interceptor: Inyectar token automáticamente
+    this.tiktokApi.interceptors.request.use((config) => {
+      if (this.accessToken) {
+        config.headers['Authorization'] = `Bearer ${this.accessToken}`;
+      }
+      return config;
+    });
+
+    // Response Interceptor: Manejo de error 401 (Token expirado)
+    this.tiktokApi.interceptors.response.use(
+      (response) => response,
+      async (error: AxiosError) => {
+        const originalRequest = error.config;
+        
+        // Verificamos si es un error 401 y no es un reintento
+        if (originalRequest && error.response?.status === 401 && !originalRequest['_retry']) {
+          this.logger.warn('Token TikTok expirado (401). Intentando refrescar...');
+          
+          originalRequest['_retry'] = true;
+
+          try {
+            await this.refreshAccessToken();
+
+            // Importante: Actualizamos el header del request original con el nuevo token
+            originalRequest.headers['Authorization'] = `Bearer ${this.accessToken}`;
+
+            // Reintentamos la petición usando la misma instancia privada
+            return this.tiktokApi(originalRequest);
+          } catch (refreshError) {
+            this.logger.error('No se pudo refrescar el token.', refreshError);
+            return Promise.reject(refreshError);
+          }
+        }
+        return Promise.reject(error);
+      }
+    );
+  }
+
+  /**
+   * Refresca el token llamando a la API de OAuth.
+   * IMPORTANTE: Usa 'axios' global (o una instancia nueva) para evitar bucles con los interceptores.
+   */
+  private async refreshAccessToken(): Promise<void> {
+    const url = 'https://open.tiktokapis.com/v2/oauth/token/';
+    const params = new URLSearchParams();
+    params.append('client_key', this.clientKey);
+    params.append('client_secret', this.clientSecret);
+    params.append('grant_type', 'refresh_token');
+    params.append('refresh_token', this.refreshToken);
+
+    try {
+      this.plogger.log('API Request: Refresh Token', { method: 'POST', url });
+      // Usamos axios puro (importado) aquí, NO this.tiktokApi
+      const response = await axios.post(url, params);
+      this.plogger.log('API Response: Refresh Token', { statusCode: response.status, success: true });
+      
+      const { access_token, refresh_token } = response.data;
+      if (!access_token) throw new Error('Respuesta inválida al refrescar token');
+
+      this.accessToken = access_token;
+      if (refresh_token) this.refreshToken = refresh_token;
+
+      this.logger.log('Token TikTok renovado correctamente.');
+      
+      // TODO: Guardar tokens en BD/Redis aquí
+
+    } catch (error) {
+      const axiosError = error as AxiosError;
+      this.plogger.error('API Error: Refresh Token', { 
+        statusCode: axiosError.response?.status,
+        apiError: axiosError.response?.data,
+        message: axiosError.message
+      });
+      throw error;
+    }
+  }
 
   async publish(data: PublicationData): Promise<PublishResult> {
     const { textContent, fileUrl } = data;
@@ -39,10 +126,7 @@ export class TiktokService implements SocialMediaPublisher {
         success: false, platform: this.platformName, error: `El archivo de video es obligatorio` 
       };
     }
-    this.logger.log(`Iniciando flujo de publicación (FILE_UPLOAD) en TikTok`, {
-      action: 'start_publish',
-      videoPath: fileUrl
-    });
+    this.logger.log(`Iniciando flujo TikTok (FILE_UPLOAD)...`);
 
     try {
       const fileBuffer = await this.storageService.read(fileUrl);
@@ -52,34 +136,18 @@ export class TiktokService implements SocialMediaPublisher {
       const { data } = await this.initiatePublish(textContent, fileSize);
       const { publish_id, upload_url } = data;
 
-      this.logger.log(`Inicialización exitosa. Subiendo video a TikTok...`, {
-        action: 'uploading_video',
-        size: fileSize,
-        uploadUrl: upload_url.substring(0, 30) + '...'
-      });
+      this.logger.log(`Subiendo video a URL firmada...`);
 
       // PASO 2: Subir el binario del video a la URL que nos dio TikTok
       await this.uploadVideoFile(upload_url, fileBuffer);
-
-      this.logger.log(`Video subido correctamente. Esperando procesamiento...`, {
-        action: 'wait_processing',
-        publishId: publish_id
-      });
+      this.logger.log(`Video subido. Esperando procesamiento (ID: ${publish_id})...`);
 
       // PASO 3: Polling (Esperar a que TikTok procese)
       const finalPostId = await this.waitForProcessing(publish_id);
-
-      return { 
-        success: true, 
-        platform: this.platformName, 
-        url: `https://www.tiktok.com/video/${finalPostId}` 
-      };
+      this.logger.log('Publicación completada en TikTok');
+      return { success: true, platform: this.platformName };
     } catch (error) {
-      this.logger.error('Falló el flujo de publicación en TikTok', {
-        action: 'publish_failed',
-        error: error.message,
-        stack: error.stack
-      });
+      this.logger.error(`Falló TikTok: ${error.message}`);
       return { success: false, platform: this.platformName, error: error.message };
     }
   }
@@ -89,8 +157,7 @@ export class TiktokService implements SocialMediaPublisher {
    * Enviamos el tamaño exacto del archivo.
    */
   private async initiatePublish(title: string, fileSizeInBytes: number): Promise<TikTokInitResponse> {
-    const url = `${this.baseUrl}/video/init/`;
-    
+    const url = `/video/init/`;
     const payload = {
       post_info: {
         title: title,
@@ -108,22 +175,22 @@ export class TiktokService implements SocialMediaPublisher {
       }
     };
     try {
-      const response = await this.httpService.axiosRef.post<TikTokInitResponse>(url, payload, this.requestConfig);
+      this.plogger.log('API Request: Init Publish', { method: 'POST', url, payload });
+      const response = await this.tiktokApi.post<TikTokInitResponse>(url, payload);
+      this.plogger.log('API Response: Init Publish', { statusCode: response.status, data: response.data });
 
       if (response.data.error && response.data.error.code !== 'ok') {
-         throw new Error(`TikTok API Error (Init): ${response.data.error.message}`);
+        throw new Error(`TikTok API Error (Init): ${response.data.error.message}`);
       }
 
       const { publish_id, upload_url } = response.data.data;
       
       if (!publish_id || !upload_url) {
-          throw new Error('La respuesta de TikTok no contiene publish_id o upload_url');
+        throw new Error('La respuesta de TikTok no contiene publish_id o upload_url');
       }
-
       return response.data;
     } catch (error) {
-      this.logger.error(`Error iniciando publicación con payload: ${JSON.stringify(payload)}`);
-      this.handleAxiosError(error, 'Error iniciando upload en TikTok');
+      this.handleAxiosError(error, 'Init Publish Error');
       throw error;
     }
   }
@@ -134,7 +201,8 @@ export class TiktokService implements SocialMediaPublisher {
    */
   private async uploadVideoFile(uploadUrl: string, fileBuffer: Buffer): Promise<void> {
     try {
-      await this.httpService.axiosRef.put(uploadUrl, fileBuffer, {
+      this.plogger.log('API Request: Upload Video Binary', { method: 'PUT', url: uploadUrl, size: fileBuffer.length });
+      await axios.put(uploadUrl, fileBuffer, {
         headers: {
           'Content-Type': 'video/mp4',
           'Content-Length': fileBuffer.length,
@@ -143,12 +211,13 @@ export class TiktokService implements SocialMediaPublisher {
           'Content-Range': `bytes 0-${fileBuffer.length - 1}/${fileBuffer.length}`
         }
       });
+      this.plogger.log('API Response: Upload Video Binary', { statusCode: 200, statusText: 'OK' });
     } catch (error) {
       const axiosError = error as AxiosError;
-      this.logger.error(`Error subiendo el binario del video`, {
-        status: axiosError.response?.status,
-        statusText: axiosError.response?.statusText,
-        data: axiosError.response?.data
+      this.plogger.error('API Error: Upload Video Binary', {
+        statusCode: axiosError.response?.status,
+        apiError: axiosError.response?.data,
+        message: axiosError.message
       });
       throw new Error(`Fallo al subir el archivo binario a TikTok: ${axiosError.message}`);
     }
@@ -158,19 +227,16 @@ export class TiktokService implements SocialMediaPublisher {
    * Paso 3: Polling
    */
   private async waitForProcessing(publishId: string): Promise<string> {
-    const url = `${this.baseUrl}/status/fetch/`;
+    const url = `/status/fetch/`;
     const payload = { publish_id: publishId };
 
     for (let attempt = 1; attempt <= this.MAX_RETRIES; attempt++) {
       try {
-        const response = await this.httpService.axiosRef.post<TikTokStatusResponse>(url, payload, this.requestConfig);
+        this.plogger.log(`API Request: Check Status (Intento ${attempt})`, { method: 'POST', url, payload });
+        const response = await this.tiktokApi.post<TikTokStatusResponse>(url, payload);
         const statusData = response.data.data;
 
-        this.logger.log(`Estado TikTok (Intento ${attempt}): ${statusData.status}`, {
-          action: 'polling_status',
-          status: statusData.status,
-          reason: statusData.fail_reason
-        });
+        this.plogger.log(`API Response: Check Status (Intento ${attempt})`, { statusCode: response.status, data: response.data });
 
         if (statusData.status === 'PUBLISH_COMPLETE') {
           const finalId = statusData.publicly_available_post_id?.[0] || 'unknown_id';
@@ -178,7 +244,7 @@ export class TiktokService implements SocialMediaPublisher {
         }
 
         if (statusData.status === 'FAILED') {
-          throw new Error(`La publicación falló en TikTok. Razón: ${statusData.fail_reason}`);
+          throw new Error(`La publicación en TikTok falló. Razón: ${statusData.fail_reason}`);
         }
 
         if (attempt === this.MAX_RETRIES) {
@@ -187,13 +253,11 @@ export class TiktokService implements SocialMediaPublisher {
 
         await this.sleep(this.RETRY_DELAY_MS);
       } catch (error) {
-        if (error.message.includes('La publicación falló') || error.message.includes('Tiempo de espera agotado')) {
-            throw error;
+        if (!error.message.includes('API Error')) {
+          this.handleAxiosError(error, 'Check Status Error');
+          throw error;
         }
-        
-        this.logger.warn(`Error polling TikTok (Intento ${attempt}): ${error.message}`);
-        if (attempt === this.MAX_RETRIES) throw error;
-        
+        if (attempt === this.MAX_RETRIES) throw error;        
         await this.sleep(this.RETRY_DELAY_MS);
       }
     }
@@ -206,7 +270,7 @@ export class TiktokService implements SocialMediaPublisher {
 
   private handleAxiosError(error: any, context: string) {
     const axiosError = error as AxiosError;
-    this.logger.error(`${context}`, {
+    this.plogger.error(`API Error: ${context}`, {
       statusCode: axiosError.response?.status,
       apiErrorData: axiosError.response?.data,
       message: axiosError.message

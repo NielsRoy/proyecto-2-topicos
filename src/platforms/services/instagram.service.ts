@@ -10,7 +10,9 @@ import { PublicationData } from '../interfaces/publication-data.interface';
 @Injectable()
 export class InstagramService implements SocialMediaPublisher {
   readonly platformName = 'instagram';
-  private readonly logger = new Logger(InstagramService.name); // O tu JsonLogger
+  private readonly logger = new Logger('InstagramService');
+  private readonly plogger = new Logger('Instagram');
+
   private readonly accountId = env.INSTAGRAM_ACCOUNT_ID;
   private readonly accessToken = env.INSTAGRAM_ACCOUNT_ACCESS_TOKEN;
   private readonly baseUrl = `https://graph.instagram.com/v24.0`;
@@ -38,17 +40,13 @@ export class InstagramService implements SocialMediaPublisher {
       caption: textContent,
       image_url: publicUrl,
     };
-    this.logger.log(`Iniciando flujo de publicación en Instagram`, {
-      action: 'start_publish',
-      contentSnippet: textContent.substring(0, 30)
-    });
+    
+    this.logger.log(`Iniciando flujo de publicación en Instagram: ${textContent.substring(0, 10)}...`);
+
     try {
       const container = await this.createContainer(containerData);
       
-      this.logger.log(`Contenedor creado, iniciando espera de validación...`, {
-        action: 'wait_validation',
-        containerId: container.id
-      });
+      this.logger.log(`Contenedor ${container.id} creado. Esperando validación...`);
 
       const status = await this.checkContainerStatus(container.id);
       if (status !== ContainerStatusCode.FINISHED) {
@@ -59,19 +57,11 @@ export class InstagramService implements SocialMediaPublisher {
       const publishResponse = await this.publishContainer(publishData);
       const { permalink } = publishResponse;
 
-      this.logger.log(`Flujo de publicación completado exitosamente`, {
-        action: 'publish_success',
-        finalId: publishResponse.id,
-        platform: this.platformName
-      });
+      this.logger.log(`Flujo de publicación completado exitosamente`);
 
       return { success: true, platform: this.platformName, url: permalink };
     } catch (error) {
-      this.logger.error('Falló el flujo de publicación en Instagram', {
-        action: 'publish_failed',
-        error: error.message,
-        stack: error.stack
-      });
+      this.logger.error(`Falló el flujo en Instagram: ${error.message}`);
       return { success: false, platform: this.platformName, error: error.message };
     }
   }
@@ -79,20 +69,17 @@ export class InstagramService implements SocialMediaPublisher {
   private async createContainer(payload: CreateContainerRequest): Promise<CreateContainerResponse> {
     const url = `${this.baseUrl}/${this.accountId}/media`;
     try {
+      this.plogger.log('API Request: Crear Contenedor', { method: 'POST', url, payload });
       const response = await this.httpService.axiosRef.post<CreateContainerResponse>(url, payload, this.config);
-      this.logger.log('Respuesta Instagram: Crear Contenedor', {
-        action: 'instagram_response_create_container',
-        statusCode: response.status,
-        responseData: response.data,
-      });
+      this.plogger.log('API Response: Crear Contenedor', { statusCode: response.status, data: response.data });
+
       if (!response.data.id) throw new Error(`ID no recibido en la respuesta de creación`);
       return response.data;
     } catch (error) {
       const axiosError = error as AxiosError;
-      this.logger.error('Error Instagram: Crear Contenedor', {
-        action: 'instagram_error_create_container',
+      this.plogger.error('API Error: Crear Contenedor', {
         statusCode: axiosError.response?.status,
-        apiErrorData: axiosError.response?.data,
+        apiError: axiosError.response?.data,
         message: axiosError.message
       });
       throw error;
@@ -103,24 +90,19 @@ export class InstagramService implements SocialMediaPublisher {
     const url = `${this.baseUrl}/${containerId}`;
     for (let attempt = 1; attempt <= this.MAX_RETRIES; attempt++) {
       try {
+        this.plogger.log(`API Request: Check Status (Intento ${attempt})`, { method: 'GET', url });
         const response = await this.httpService.axiosRef.get<ContainerStatusResponse>(url, this.config);
         const { status_code } = response.data;
-
-        this.logger.log(`Respuesta Instagram: Revisar Contenedor, intento ${attempt}`, {
-          action: 'instagram_response_check_container',
-          statusCode: response.status,
-          responseData: response.data,
-        });
+        this.plogger.log(`API Response: Check Status (Intento ${attempt})`, { statusCode: response.status, data: response.data });
 
         if (status_code === ContainerStatusCode.FINISHED || attempt === this.MAX_RETRIES) {
           return status_code;
         }
       } catch (error) {
         const axiosError = error as AxiosError;
-        this.logger.error('Error Instagram: Revisar Contenedor', {
-          action: 'instagram_error_check_container',
+        this.plogger.error('API Error: Check Status', {
           statusCode: axiosError.response?.status,
-          apiErrorData: axiosError.response?.data,
+          apiError: axiosError.response?.data,
           message: axiosError.message
         });
         throw error;
@@ -133,21 +115,16 @@ export class InstagramService implements SocialMediaPublisher {
   private async publishContainer(payload: PublishContainerRequest): Promise<PublishContainerResponse> {
     const url = `${this.baseUrl}/${this.accountId}/media_publish?fields=permalink`;
     try {
+      this.plogger.log('API Request: Publicar Contenedor', { method: 'POST', url, payload });
       const response = await this.httpService.axiosRef.post<PublishContainerResponse>(url, payload, this.config);
-      
-      this.logger.log('Respuesta Instagram: Publicar Contenedor', {
-        action: 'instagram_response_publish_container',
-        statusCode: response.status,
-        responseData: response.data,
-      });
+      this.plogger.log('API Response: Publicar Contenedor', { statusCode: response.status, data: response.data });
       
       return response.data;
     } catch (error) {
       const axiosError = error as AxiosError;
-      this.logger.error('Error Instagram: Publicar Contenedor', {
-        action: 'instagram_error_publish_container',
+      this.plogger.error('API Error: Publicar Contenedor', {
         statusCode: axiosError.response?.status,
-        apiErrorData: axiosError.response?.data,
+        apiError: axiosError.response?.data,
         message: axiosError.message
       });
       throw error;

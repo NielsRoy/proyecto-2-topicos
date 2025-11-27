@@ -9,8 +9,9 @@ import { AxiosError } from 'axios';
 @Injectable()
 export class WhatsappService implements SocialMediaPublisher {
   readonly platformName = 'whatsapp';
-  private readonly logger = new Logger(WhatsappService.name);
-  
+  private readonly logger = new Logger('WhatsappService');
+  private readonly plogger = new Logger('Whatsapp');
+
   private readonly baseUrl = 'https://gate.whapi.cloud'; 
   private readonly apiToken = env.WHATSAPP_API_TOKEN;
 
@@ -26,9 +27,9 @@ export class WhatsappService implements SocialMediaPublisher {
       };
     }
     
+    this.logger.log(`Iniciando publicación de historia en WhatsApp...`);
+
     try {
-      this.logger.log(`Publicando historia en WhatsApp...`);
-      
       const payload = {
         media: publicUrl,
         caption: textContent,
@@ -43,23 +44,19 @@ export class WhatsappService implements SocialMediaPublisher {
           'Authorization': `Bearer ${this.apiToken}`,
         },
       };
-
+      this.plogger.log('API Request: Send Story', { method: 'POST', url, payload });
       const response = await this.httpService.axiosRef.post(url, payload, config);
 
-      this.logger.log('Historia publicada exitosamente en WhatsApp', {
-        id: response.data.sent ? 'sent' : 'unknown',
-      });
+      this.plogger.log('API Response: Send Story', { statusCode: response.status, data: response.data });
+      this.logger.log('Historia publicada exitosamente en WhatsApp');
 
       return { success: true, platform: this.platformName };
     } catch (error) {
       const axiosError = error as AxiosError;
-      this.logger.error('Fallo al publicar estado en Whatsapp', {
-        platform: this.platformName,
-        state: 'error',
+      this.plogger.error('API Error: Send Story', {
         statusCode: axiosError.response?.status,
-        errorMessage: axiosError.message,
-        responseData: axiosError.response?.data,
-        stack: error.stack
+        apiError: axiosError.response?.data,
+        message: axiosError.message
       });
       return { success: false, platform: this.platformName, error: error.message };
     }

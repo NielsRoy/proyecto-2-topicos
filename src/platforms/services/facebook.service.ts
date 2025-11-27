@@ -10,7 +10,8 @@ import { PublicationData } from '../interfaces/publication-data.interface';
 @Injectable()
 export class FacebookService implements SocialMediaPublisher {
   readonly platformName = 'facebook';
-  private readonly logger = new Logger(FacebookService.name);
+  private readonly logger = new Logger('FacebookService');
+  private readonly plogger = new Logger('Facebook');
 
   private readonly pageId = env.FACEBOOK_PAGE_ID;
   private readonly accessToken = env.FACEBOOK_PAGE_ACCESS_TOKEN;
@@ -39,28 +40,33 @@ export class FacebookService implements SocialMediaPublisher {
     this.logger.log(`Publicando en Facebook (${endpoint}): ${textContent.substring(0, 10)}...`);
 
     try {
+      this.plogger.log('API Request: Publicar Post', {
+        method: 'POST',
+        url,
+        payload
+      });
+
       const response = await this.httpService.axiosRef.post<FacebookResponse>(url, payload, this.config);
 
-      this.logger.log('Respuesta exitosa de Facebook', {
-        platform: this.platformName,
-        state: 'success',
+      this.plogger.log('API Response: Publicar Post', {
         statusCode: response.status,
-        responseData: response.data,
+        data: response.data,
       });
+
+      this.logger.log('Publicación finalizada con éxito en Facebook');
 
       const post = response.data.post_id ?? response.data.id;
       const link = `${this.baseLink}/${post}`;
       return { success: true, platform: this.platformName, url: link };
     } catch (error) {
       const axiosError = error as AxiosError;
-      this.logger.error('Fallo al publicar en Facebook', {
-        platform: this.platformName,
-        state: 'error',
+
+      this.plogger.error('API Error: Publicar Post', {
         statusCode: axiosError.response?.status,
-        errorMessage: axiosError.message,
-        responseData: axiosError.response?.data,
-        stack: error.stack
+        apiError: axiosError.response?.data,
+        message: axiosError.message
       });
+
       return { success: false, platform: this.platformName, error: error.message };
     }
   }
