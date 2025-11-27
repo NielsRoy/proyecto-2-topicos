@@ -4,16 +4,18 @@ import { Readable } from 'stream';
 import { ResourceType } from '../enum/resource-type.enum';
 import { env } from '../../config/env.config';
 import path from 'path';
+import { HttpService } from '@nestjs/axios';
+import { StorageService } from '../common/file-storage.interface';
 
 @Injectable()
-export class CloudinaryStorageService {
+export class CloudinaryStorageService implements StorageService {
 
   private readonly folders = new Map<ResourceType, string>([
     [ResourceType.image, 'images'],
     [ResourceType.video, 'videos']
   ]);
 
-  constructor() {
+  constructor(private readonly httpService: HttpService) {
     cloudinary.config({
       cloud_name: env.CLOUDINARY_CLOUD_NAME,
       api_key: env.CLOUDINARY_API_KEY,
@@ -57,5 +59,21 @@ export class CloudinaryStorageService {
       // 2. Convertimos el Buffer en un Stream legible y lo enviamos (pipe) a Cloudinary
       Readable.from(buffer).pipe(uploadStream);
     });
+  }
+
+  async read(fileUrl: string): Promise<Buffer> {
+    try {
+      if (!fileUrl) throw new Error('La URL del archivo es requerida');
+
+      // Descargamos el archivo como un arraybuffer (datos binarios puros)
+      const response = await this.httpService.axiosRef.get(fileUrl, {
+        responseType: 'arraybuffer'
+      });
+
+      // Convertimos el resultado a un Buffer de Node.js
+      return Buffer.from(response.data);
+    } catch (error) {
+      throw new Error(`Error al descargar el archivo de Cloudinary: ${error.message}`);
+    }
   }
 }

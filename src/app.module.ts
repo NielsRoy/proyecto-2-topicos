@@ -13,6 +13,7 @@ import { StorageModule } from './storage/storage.module';
     PublishingModule,
     LlmModule,
     UsersModule,
+    StorageModule,
     TypeOrmModule.forRoot({
       ssl: env.STATE === 'production',
       extra: {
@@ -29,7 +30,6 @@ import { StorageModule } from './storage/storage.module';
       synchronize: true,
       autoLoadEntities: true,
     }),
-    StorageModule,
   ],
 })
 export class AppModule {}

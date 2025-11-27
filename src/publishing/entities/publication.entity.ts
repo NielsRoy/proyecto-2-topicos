@@ -18,11 +18,11 @@ export class Publication {
   @Column('text')
   textContent: string;
 
-  @Column('text')
-  filepath: string;
+  // @Column('text')
+  // filepath: string;
 
   @Column('text')
-  publicUrl: string;
+  fileUrl: string;
   
   @Column('enum', { enum: SocialMedia })
   socialMedia: SocialMedia;
@@ -48,7 +48,7 @@ export class Publication {
     return {
       publicationId: this.id,
       textContent: this.textContent,
-      fileUrl: this.publicUrl,
+      fileUrl: this.fileUrl,
       socialMedia: this.socialMedia
     };
   }

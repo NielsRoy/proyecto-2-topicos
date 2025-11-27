@@ -2,9 +2,10 @@ import { Injectable } from '@nestjs/common';
 import { ResourceType } from '../enum/resource-type.enum';
 import path from 'path';
 import * as fs from 'fs';
+import { StorageService } from '../common/file-storage.interface';
 
 @Injectable()
-export class LocalStorageService {
+export class LocalStorageService implements StorageService {
 
   private readonly storageDir = path.join(process.cwd(), 'storage');
   private readonly folders = new Map<ResourceType, string>([
@@ -12,23 +13,28 @@ export class LocalStorageService {
     [ResourceType.video, 'videos']
   ]);
 
-  save(
+  async save(
     buffer: Buffer,
     fileName: string,
     resourceType: ResourceType = ResourceType.auto
-  ): string {
-    const folder = this.folders.get(resourceType);
-    if (!folder) throw new Error(`No existe una carpeta para el tipo de recurso: ${resourceType}`);
-    const filePath = path.join(this.storageDir, folder, fileName);
-    if (!fs.existsSync(folder)) fs.mkdirSync(folder);
-    fs.writeFileSync(filePath, buffer);
+  ): Promise<string> {
+    const folderName = this.folders.get(resourceType);
+    if (!folderName) {
+      throw new Error(`No existe una carpeta para el tipo de recurso: ${resourceType}`);
+    }
+    const directoryPath = path.join(this.storageDir, folderName);
+    const filePath = path.join(directoryPath, fileName);
+    await fs.promises.mkdir(directoryPath, { recursive: true });
+    await fs.promises.writeFile(filePath, buffer);
     return filePath;
   }
 
-  read(filepath: string) {
-    if (!fs.existsSync(filepath)) {
-      throw new Error(`El archivo de video no existe en la ruta: ${filepath}`);
+  async read(filepath: string): Promise<Buffer> {
+    try {
+      await fs.promises.access(filepath);
+    } catch (error) {
+      throw new Error(`El archivo no existe en la ruta: ${filepath}`);
     }
-    return fs.readFileSync(filepath);
+    return await fs.promises.readFile(filepath);
   }
 }

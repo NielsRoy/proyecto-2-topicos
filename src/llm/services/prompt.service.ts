@@ -9,7 +9,7 @@ export class PromptService implements OnModuleInit {
   private prompt: string = '';
 
   onModuleInit() {
-    const filename = 'prompt-v0.0.3.txt';
+    const filename = 'prompt-v1.0.0.txt';
     const filepath = path.join(process.cwd(), 'dist', 'prompts', filename);
     this.prompt = this.loadTemplate(filepath);
   }

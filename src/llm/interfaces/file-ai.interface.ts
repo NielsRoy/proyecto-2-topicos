@@ -1,4 +1,4 @@
 export interface FileAI {
-  filepath: string;
+  //filepath: string;
   publicUrl: string;
 }

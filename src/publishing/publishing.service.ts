@@ -4,7 +4,6 @@ import { ChatInputDto } from './dto/chat-input.dto';
 import type { LLMService } from '../llm/common/llm-service.interface';
 import { LLM_SERVICE } from 'src/config/injection-tokens';
 import { ImageGenerator } from '../llm/services/image-generator.service';
-import { CloudinaryStorageService } from '../storage/services/cloudinary-storage.service';
 import { InjectRepository } from '@nestjs/typeorm';
 import { ChatInput } from './entities/chat-input.entity';
 import { Repository } from 'typeorm';
@@ -28,7 +27,6 @@ export class PublishingService {
 
     private readonly imageGenerator: ImageGenerator,
     private readonly videoGenerator: VideoGenerator,
-    private readonly cloudinaryService: CloudinaryStorageService,
 
     @InjectRepository(ChatInput)
     private readonly chatInputRepository: Repository<ChatInput>,
@@ -55,40 +53,35 @@ export class PublishingService {
 
     const facebook = await this.createPublication({
       textContent: llmResponse.facebook,
-      filepath: image.filepath,
-      publicUrl: image.publicUrl,
+      fileUrl: image.publicUrl,
       socialMedia: SocialMedia.FACEBOOK,
       chatInputId,
     });
 
     const instagram = await this.createPublication({
       textContent: llmResponse.instagram,
-      filepath: image.filepath,
-      publicUrl: image.publicUrl,
+      fileUrl: image.publicUrl,
       socialMedia: SocialMedia.INSTAGRAM,
       chatInputId,
     });
 
     const linkedin = await this.createPublication({
       textContent: llmResponse.linkedin,
-      filepath: image.filepath,
-      publicUrl: image.publicUrl,
+      fileUrl: image.publicUrl,
       socialMedia: SocialMedia.LINKEDIN,
       chatInputId,
     });
 
     const whatsapp = await this.createPublication({
       textContent: llmResponse.whatsapp,
-      filepath: image.filepath,
-      publicUrl: image.publicUrl,
+      fileUrl: image.publicUrl,
       socialMedia: SocialMedia.WHATSAPP,
       chatInputId,
     });
 
     const tiktok = await this.createPublication({
       textContent: llmResponse.tiktok,
-      filepath: video.filepath,
-      publicUrl: video.publicUrl,
+      fileUrl: video.publicUrl,
       socialMedia: SocialMedia.TIKTOK,
       chatInputId,
     });
@@ -98,11 +91,10 @@ export class PublishingService {
 
   private async createPublication(dto: createPublicationDto): Promise<PublicationResponse> {
     try {
-      const { textContent, filepath, publicUrl, socialMedia, chatInputId } = dto;
+      const { textContent, fileUrl, socialMedia, chatInputId } = dto;
       const publication = this.publicationRepository.create({
         textContent,
-        filepath,
-        publicUrl,
+        fileUrl,
         socialMedia,
         chatInput: { id: chatInputId },
       });
@@ -117,24 +109,21 @@ export class PublishingService {
     try {
       const publication = await this.publicationRepository.findOneBy({ id });
       if (!publication) throw new NotFoundException(`La publicación con id = ${id} no existe.`);
-      const { textContent, filepath, publicUrl } = publication;
-      return { textContent, filepath, publicUrl };
+      const { textContent, fileUrl } = publication;
+      return { textContent, fileUrl };
     } catch (e) {
       throw new InternalServerErrorException('Error al obtener la publicación', e);
     }
   }
 
   async test(dto: ChatInputDto) {
+    const { message } = dto;
+
     this.logger.log(`Procesando solicitud: ${dto.message}`);
 
-    const response = this.imageGenerator.generate(dto.message);
-    this.logger.log(response);
+    const enhancedPrompt = this.promptService.generate();
+    const llmResponse = await this.llmService.generate(enhancedPrompt, message);
 
-    return response;
-    
-    //const publisher = this.platformMap.get("whatsapp");
-    //publisher?.publish(dto.message);
-
-    //return enhancedPrompt;
+    return llmResponse;
   }
 }

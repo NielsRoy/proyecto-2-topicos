@@ -18,7 +18,7 @@ export class WhatsappService implements SocialMediaPublisher {
 
   async publish(data: PublicationData): Promise<PublishResult> {
     const url = `${this.baseUrl}/stories/send/media`;
-    const { textContent, publicUrl } = data;
+    const { textContent, fileUrl: publicUrl } = data;
     
     if (!publicUrl){
       return {

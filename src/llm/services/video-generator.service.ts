@@ -1,11 +1,11 @@
-import { Injectable, InternalServerErrorException, Logger } from '@nestjs/common';
+import { Inject, Injectable, InternalServerErrorException, Logger } from '@nestjs/common';
 import OpenAI from 'openai';
 import { env } from '../../config/env.config';
 import { randomBytes } from 'crypto';
 import { ResourceType } from '../../storage/enum/resource-type.enum';
-import { LocalStorageService } from '../../storage/services/local-storage.service';
-import { CloudinaryStorageService } from '../../storage/services/cloudinary-storage.service';
 import { FileAI } from '../interfaces/file-ai.interface';
+import { STORAGE_SERVICE } from '../../config/injection-tokens';
+import type { StorageService } from '../../storage/common/file-storage.interface';
 
 @Injectable()
 export class VideoGenerator {
@@ -15,8 +15,8 @@ export class VideoGenerator {
   private readonly POLL_DELAY_MS = 3000;
 
   constructor(
-    private readonly localStorageService: LocalStorageService,
-    private readonly cloudinaryStorageService: CloudinaryStorageService,
+    @Inject(STORAGE_SERVICE)
+    private readonly storageService: StorageService,
   ) {
     this.openai = new OpenAI({
       apiKey: env.OPENAI_API_KEY,
@@ -64,10 +64,8 @@ export class VideoGenerator {
   private async save(buffer: Buffer): Promise<FileAI> {
     const uniqueId = randomBytes(8).toString('hex'); 
     const fileName = `vid-${uniqueId}.mp4`;
-
-    const publicUrl = await this.cloudinaryStorageService.save(buffer, fileName, ResourceType.video);
-    const filepath = this.localStorageService.save(buffer, fileName, ResourceType.video);
-    return { filepath, publicUrl };
+    const publicUrl = await this.storageService.save(buffer, fileName, ResourceType.video);
+    return { publicUrl };
   }
 
   private sleep(ms: number): Promise<void> {

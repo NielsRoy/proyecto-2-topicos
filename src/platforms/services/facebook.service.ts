@@ -27,7 +27,7 @@ export class FacebookService implements SocialMediaPublisher {
   constructor(private readonly httpService: HttpService) {}
 
   async publish(data: PublicationData): Promise<PublishResult> {
-    const { textContent, publicUrl } = data;
+    const { textContent, fileUrl: publicUrl } = data;
     const isPhotoPost = !!publicUrl;
     const endpoint = isPhotoPost ? 'photos' : 'feed';
     const url = `${this.baseUrl}/${endpoint}`;

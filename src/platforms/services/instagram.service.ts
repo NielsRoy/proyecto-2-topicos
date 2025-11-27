@@ -28,7 +28,7 @@ export class InstagramService implements SocialMediaPublisher {
   constructor(private readonly httpService: HttpService) {}
 
   async publish(data: PublicationData): Promise<PublishResult> {
-    const { textContent, publicUrl } = data;
+    const { textContent, fileUrl: publicUrl } = data;
     if (!publicUrl){
       return {
         success: false, platform: this.platformName, error: 'La url de imagen es obligatoria.'

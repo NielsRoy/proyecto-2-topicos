@@ -1,11 +1,12 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 import { SocialMediaPublisher } from '../common/social-media-publisher.interface';
 import { PublishResult } from '../interfaces/publish-result.interface';
 import { env } from '../../config/env.config';
 import { AxiosError, AxiosRequestConfig } from 'axios';
 import { HttpService } from '@nestjs/axios';
 import { PublicationData } from '../interfaces/publication-data.interface';
-import { LocalStorageService } from '../../storage/services/local-storage.service';
+import { STORAGE_SERVICE } from '../../config/injection-tokens';
+import type { StorageService } from '../../storage/common/file-storage.interface';
 
 @Injectable()
 export class LinkedInService implements SocialMediaPublisher {
@@ -25,14 +26,16 @@ export class LinkedInService implements SocialMediaPublisher {
 
   constructor(
     private readonly httpService: HttpService,
-    private readonly localStorageService: LocalStorageService,
+    
+    @Inject(STORAGE_SERVICE)
+    private readonly storageService: StorageService,
   ) {}
 
   async publish(data: PublicationData): Promise<PublishResult> {
     try {
-      const { textContent, filepath } = data;
-      if (filepath) {
-        return await this.publishWithImage(textContent, filepath);
+      const { textContent, fileUrl } = data;
+      if (fileUrl) {
+        return await this.publishWithImage(textContent, fileUrl);
       }
       return await this.publishText(textContent);
     } catch (error) {
@@ -88,8 +91,7 @@ export class LinkedInService implements SocialMediaPublisher {
     this.logger.log('Subiendo binario a LinkedIn...');
     
     //TODO: Revisar si publish() captura bien el mensaje de error de localStorageService
-    const fileBuffer = this.localStorageService.read(filepath);
-    //const fileBuffer = await fs.readFile(filepath);
+    const fileBuffer = await this.storageService.read(filepath);
     
     await this.httpService.axiosRef.post(uploadUrl, fileBuffer, {
       headers: {
