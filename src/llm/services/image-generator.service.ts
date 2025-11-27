@@ -29,7 +29,6 @@ export class ImageGenerator {
         prompt: prompt,
         n: 1, // DALL-E 3 solo permite generar 1 imagen por request
         size: '1024x1024',
-        response_format: 'b64_json',
       });
       // this.logger.log(response);
       if (!response.data || response.data.length === 0) {
