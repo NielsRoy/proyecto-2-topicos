@@ -1,8 +1,9 @@
-import { Body, Controller, Post } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Post } from '@nestjs/common';
 import { PublishingService } from '../../publishing/publishing.service';
 import { InstagramService } from '../services/instagram.service';
 import { PublicationDto } from '../../publishing/dto/publication.dto';
 import { PublishResult } from '../interfaces/publish-result.interface';
+import { SocialMedia } from '../../publishing/enum/social-media.enum';
 
 @Controller('instagram')
 export class InstagramController {
@@ -14,7 +15,12 @@ export class InstagramController {
 
   @Post('publish')
   async publish(@Body() dto: PublicationDto): Promise<PublishResult> {
-    const data = await this.publishingService.getPublicationDataById(dto.publicationId);
-    return await this.instagramService.publish(data);
+    const { publicationId } = dto;
+    const valid = await this.publishingService.validateTargetSocialMedia(publicationId, SocialMedia.INSTAGRAM);
+    if (!valid) throw new BadRequestException(`La publicación con id = ${publicationId} no esta destinada para la red social: ${SocialMedia.INSTAGRAM}`);
+    const data = await this.publishingService.getPublicationDataById(publicationId);
+    const response = await this.instagramService.publish(data);
+    if (response.success) await this.publishingService.setPublicationAsPublished(publicationId);
+    return response;
   }
 }

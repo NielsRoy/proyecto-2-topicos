@@ -14,6 +14,8 @@ import { Publication } from './entities/publication.entity';
 import { SocialMedia } from './enum/social-media.enum';
 import { createPublicationDto } from './dto/create-publication.dto';
 import { PublicationData } from '../platforms/interfaces/publication-data.interface';
+import { PaginationDto } from '../common/dto/pagination.dto';
+import { PublicationState } from './enum/publication-state.enum';
 
 @Injectable()
 export class PublishingService {
@@ -114,6 +116,43 @@ export class PublishingService {
     } catch (e) {
       throw new InternalServerErrorException('Error al obtener la publicación', e);
     }
+  }
+
+  async getChatInputsByUserId(userId: number, paginationDto: PaginationDto) {
+    try {
+      const { limit = 10, offset = 0 } = paginationDto;
+      const messages = await this.chatInputRepository.find({
+        take: limit,
+        skip: offset,
+        where: { user: { id: userId } },
+        order: { createdAt: 'DESC' },
+      })
+      return messages;
+    } catch (e) {
+      throw new InternalServerErrorException(`Error al obtener los mensajes del usuario con id = ${userId}`, e);
+    }
+  }
+
+  async getPublicationsByChatInputId(chatInputId: number) {
+    try {
+      const publications = await this.publicationRepository.findBy({ chatInput: { id: chatInputId } });
+      return publications;
+    } catch (e) {
+      throw new InternalServerErrorException(`Error al obtener las publicaciones del mensaje con id = ${chatInputId}`, e);
+    }
+  }
+
+  async validateTargetSocialMedia(publicationId: number, socialMedia: SocialMedia): Promise<boolean> {
+    const result = await this.publicationRepository.findOneBy({ id: publicationId, socialMedia });
+    return !!result;
+  }
+
+  async setPublicationAsPublished(publicationId: number) {
+    const p = await this.publicationRepository.preload({ 
+      state: PublicationState.PUBLISHED, id: publicationId 
+    });
+    if (!p) return;
+    await this.publicationRepository.save(p);
   }
 
   async test(dto: ChatInputDto) {
