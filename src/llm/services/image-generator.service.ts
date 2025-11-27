@@ -25,7 +25,7 @@ export class ImageGenerator {
   async generate(prompt: string): Promise<FileAI> {
     try {
       const response = await this.openai.images.generate({
-        model: 'gpt-image-1-mini',
+        model: 'gpt-image-1',
         prompt: prompt,
         n: 1, // DALL-E 3 solo permite generar 1 imagen por request
         size: '1024x1024',
